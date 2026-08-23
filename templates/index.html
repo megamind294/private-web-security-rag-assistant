@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Private Web Security Assistant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <p class="eyebrow">University RAG Project</p>
+      <h1>Private Web Security Assistant</h1>
+      <p>Ask web-security questions and receive answers grounded in a local OWASP Cheat Sheet knowledge base with source citations.</p>
+    </header>
+
+    <section class="panel">
+      <form id="askForm">
+        <label for="question">Ask a security question</label>
+        <textarea id="question" rows="4" required placeholder="How can I prevent SQL injection in a web application?"></textarea>
+        <div class="controls">
+          <label class="mode-label">Answer mode
+            <select id="mode">
+              <option value="security">Security RAG</option>
+              <option value="local">Local</option>
+              <option value="extractive">Extractive</option>
+            </select>
+          </label>
+          <button id="submitButton" type="submit">Ask assistant</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="result" class="result" hidden aria-live="polite">
+      <div class="answer-card">
+        <div class="answer-heading"><h2>Answer</h2><span id="answerMode" class="badge"></span></div>
+        <p id="answerText"></p>
+      </div>
+      <div class="sources-card">
+        <h2>OWASP sources</h2>
+        <div id="citations"></div>
+      </div>
+    </section>
+
+    <div id="error" class="error" hidden role="alert"></div>
+  </main>
+
+  <script>
+    const form = document.querySelector('#askForm');
+    const button = document.querySelector('#submitButton');
+    const result = document.querySelector('#result');
+    const errorBox = document.querySelector('#error');
+    const answerText = document.querySelector('#answerText');
+    const answerMode = document.querySelector('#answerMode');
+    const citations = document.querySelector('#citations');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      result.hidden = true;
+      button.disabled = true;
+      button.textContent = 'Searching OWASP…';
+      try {
+        const response = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: document.querySelector('#question').value,
+            mode: document.querySelector('#mode').value
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Request failed');
+        answerText.textContent = payload.answer;
+        answerMode.textContent = payload.mode;
+        citations.innerHTML = '';
+        for (const citation of payload.citations || []) {
+          const article = document.createElement('article');
+          article.className = 'citation';
+          const score = Number(citation.score || 0).toFixed(3);
+          article.innerHTML = `<div><strong></strong><span>Similarity ${score}</span></div><a target="_blank" rel="noreferrer">Open source ↗</a>`;
+          article.querySelector('strong').textContent = citation.source_title;
+          const link = article.querySelector('a');
+          link.href = citation.source_url;
+          citations.appendChild(article);
+        }
+        if (!citations.children.length) citations.textContent = 'No citations returned.';
+        result.hidden = false;
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.hidden = false;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Ask assistant';
+      }
+    });
+  </script>
+</body>
+</html>

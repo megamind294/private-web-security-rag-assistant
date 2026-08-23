@@ -20,6 +20,13 @@ def client():
     return app.test_client()
 
 
+def test_index_page_renders(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"Private Web Security Assistant" in response.data
+    assert b"Ask a security question" in response.data
+
+
 def test_health_endpoint(client):
     response = client.get("/health")
     assert response.status_code == 200
